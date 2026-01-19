@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura Espacial 🚀</title>
+    <link rel="icon" type="image/png" href="cohete.png">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial,sans-serif;background:#000;overflow:hidden;height:100vh}
+        #gameContainer{position:relative;width:100vw;height:100vh}
+        #canvas{display:block;background:radial-gradient(ellipse at center,#1a1a3e 0%,#0a0a1e 100%)}
+        .star{position:absolute;background:#fff;border-radius:50%;animation:twinkle 3s infinite}
+        @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
+        .hud{position:absolute;top:20px;background:rgba(20,20,60,.9);padding:15px 25px;border-radius:15px;box-shadow:0 4px 20px rgba(0,200,255,.5);border:2px solid #00d4ff;color:#fff;font-size:16px}
+        #hud1{left:20px}
+        #hud2{right:20px;border-color:#ff00ff;box-shadow:0 4px 20px rgba(255,0,200,.5);display:none}
+        .hud-item{margin:5px 0}
+        #question{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(139,0,255,.9);padding:20px 30px;border-radius:15px;box-shadow:0 4px 20px rgba(139,0,255,.6);border:2px solid #ff00ff;font-size:28px;font-weight:bold;color:#fff;text-align:center}
+        #timer{position:absolute;top:100px;left:50%;transform:translateX(-50%);font-size:48px;font-weight:bold;color:#ff0;text-shadow:0 0 20px #ff0}
+        #timer.warning{color:#f00;animation:pulse .5s infinite}
+        @keyframes pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.2)}}
+        #instructions,#gameOver{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(20,20,60,.98);padding:40px;border-radius:20px;box-shadow:0 8px 40px rgba(0,200,255,.8);border:3px solid #00d4ff;text-align:center;color:#fff;max-width:700px;max-height:90vh;overflow-y:auto}
+        #instructions h2{color:#00d4ff;margin-bottom:20px;font-size:32px;text-shadow:0 0 10px #00d4ff}
+        #instructions p{margin:10px 0;font-size:16px;line-height:1.5}
+        .btn{margin:10px 5px;padding:15px 30px;font-size:20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border:none;border-radius:10px;cursor:pointer;font-weight:bold;color:#fff;transition:all .3s}
+        .btn:hover{transform:scale(1.1)}
+        .difficulty-btn{display:inline-block;padding:8px 12px;margin:3px;border:2px solid #00d4ff;background:rgba(0,212,255,.2);color:#fff;border-radius:8px;cursor:pointer;font-size:14px}
+        .difficulty-btn.active{background:rgba(0,212,255,.8);border-color:#ff0}
+        .hidden{display:none!important}
+        #feedbackAnimation{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:100px;font-weight:bold;pointer-events:none;opacity:0;z-index:1000}
+        #feedbackAnimation.show{animation:feedback .8s}
+        @keyframes feedback{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+        #muteBtn{position:absolute;top:20px;right:20px;padding:10px 15px;background:rgba(20,20,60,.9);border:2px solid #00d4ff;border-radius:8px;color:#fff;font-size:20px;cursor:pointer;z-index:100}
+        .time-input{padding:8px;font-size:16px;border-radius:8px;border:2px solid #00d4ff;background:rgba(0,212,255,.2);color:#fff;width:80px;text-align:center}
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="canvas"></canvas>
+        <button id="muteBtn" class="hidden">🔊</button>
+        
+        <div id="hud1" class="hud">
+            <div class="hud-item">🚀 <b>J1</b> (Flechas)</div>
+            <div class="hud-item">🌟: <span id="score1">0</span></div>
+            <div class="hud-item">❤️: <span id="lives1">5</span></div>
+            <div class="hud-item">🔥: <span id="streak1">0</span></div>
+        </div>
+
+        <div id="hud2" class="hud">
+            <div class="hud-item">🛸 <b>J2</b> (WASD)</div>
+            <div class="hud-item">🌟: <span id="score2">0</span></div>
+            <div class="hud-item">❤️: <span id="lives2">5</span></div>
+            <div class="hud-item">🔥: <span id="streak2">0</span></div>
+        </div>
+        
+        <div id="question"><span id="mathQuestion">0 + 0 = ?</span></div>
+        <div id="timer">⏱️ <span id="timeLeft">10</span></div>
+        <div id="feedbackAnimation"></div>
+
+        <div id="instructions">
+            <h2>🚀 MATEMÁTICA ESPACIAL</h2>
+            <div id="modeSelect">
+                <button class="btn" onclick="selectMode(1)">👤 1 JUGADOR</button>
+                <button class="btn" onclick="selectMode(2)">👥 2 JUGADORES</button>
+            </div>
+            <div id="setup" class="hidden">
+                <button class="btn" onclick="goBack()" style="position:absolute;top:10px;left:10px;padding:10px 20px;font-size:16px">← Volver</button>
+                <p>⏱️ Tiempo: <input type="number" id="timeInput" class="time-input" value="15" min="5" max="60"> seg</p>
+                <div style="margin:15px 0">
+                    <p><b>🎯 Operaciones:</b></p>
+                    <button class="difficulty-btn active" data-type="suma">➕ Suma</button>
+                    <button class="difficulty-btn active" data-type="resta">➖ Resta</button>
+                    <button class="difficulty-btn" data-type="mult">✖️ Mult</button>
+                    <button class="difficulty-btn" data-type="div">➗ Div</button>
+                    <button class="difficulty-btn" data-type="frac">📊 Frac</button>
+                    <button class="difficulty-btn" data-type="pot">🔢 Pot</button>
+                </div>
+                <p id="controls">🎮 Flechas para mover</p>
+                <button class="btn" onclick="startGame()">🚀 COMENZAR</button>
+            </div>
+        </div>
+
+        <div id="gameOver" class="hidden">
+            <h2 style="color:#f06">🎮 GAME OVER</h2>
+            <div id="results"></div>
+            <button class="btn" onclick="location.reload()">🔄 REINICIAR</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let gameRunning = false, twoPlayer = false, timePerQ = 15, timeLeft = 15, timerInt, correct = '', muted = false, answerGiven = false;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let bgMusic;
+
+        const p1 = {x:canvas.width/2-100,y:canvas.height-100,size:40,speed:6,dx:0,dy:0,score:0,lives:5,streak:0,color:'#0df',destroyed:false,exploding:false,explosionFrame:0};
+        const p2 = {x:canvas.width/2+100,y:canvas.height-100,size:40,speed:6,dx:0,dy:0,score:0,lives:5,streak:0,color:'#f0f',destroyed:false,exploding:false,explosionFrame:0};
+        
+        const ops = {suma:true,resta:true,mult:false,div:false,frac:false,pot:false};
+        const asteroids = [];
+        const particles = [];
+        const keys = {};
+        const colors = ['#F66','#4EC','#45B','#FA7','#9D8','#F7D','#B8F','#85C'];
+
+        for(let i=0;i<100;i++){
+            const s = document.createElement('div');
+            s.className='star';
+            s.style.width=s.style.height=Math.random()*3+'px';
+            s.style.left=Math.random()*100+'%';
+            s.style.top=Math.random()*100+'%';
+            s.style.animationDelay=Math.random()*3+'s';
+            document.getElementById('gameContainer').appendChild(s);
+        }
+
+        document.querySelectorAll('.difficulty-btn').forEach(b=>b.onclick=function(){
+            ops[this.dataset.type]=!ops[this.dataset.type];
+            this.classList.toggle('active');
+        });
+
+        function selectMode(m){
+            twoPlayer=m===2;
+            document.getElementById('modeSelect').style.display='none';
+            document.getElementById('setup').classList.remove('hidden');
+            if(twoPlayer){
+                document.getElementById('controls').textContent='🎮 J1: Flechas | J2: WASD';
+                document.getElementById('hud2').style.display='block';
+            }
+        }
+
+        function goBack(){
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('modeSelect').style.display='block';
+            document.getElementById('hud2').style.display='none';
+        }
+
+        function sound(f,d,t='sine'){
+            if(muted)return;
+            const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+            o.connect(g);g.connect(audioCtx.destination);
+            o.frequency.value=f;o.type=t;
+            g.gain.setValueAtTime(.3,audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(.01,audioCtx.currentTime+d);
+            o.start();o.stop(audioCtx.currentTime+d);
+        }
+
+        function correctSound(){sound(523,.1);setTimeout(()=>sound(659,.1),100);setTimeout(()=>sound(784,.2),200)}
+        function wrongSound(){sound(200,.1,'sawtooth');setTimeout(()=>sound(150,.2,'sawtooth'),100)}
+        
+        function victorySound(){
+            const melody = [
+                {freq: 523, time: 0, dur: .15},
+                {freq: 587, time: 150, dur: .15},
+                {freq: 659, time: 300, dur: .15},
+                {freq: 784, time: 450, dur: .2},
+                {freq: 659, time: 650, dur: .15},
+                {freq: 784, time: 800, dur: .3},
+                {freq: 1047, time: 1100, dur: .5}
+            ];
+            
+            melody.forEach(note => {
+                setTimeout(() => {
+                    if(!muted){
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.frequency.value = note.freq;
+                        o.type = 'triangle';
+                        g.gain.setValueAtTime(.3, audioCtx.currentTime);
+                        g.gain.exponentialRampToValueAtTime(.01, audioCtx.currentTime + note.dur);
+                        o.start();
+                        o.stop(audioCtx.currentTime + note.dur);
+                    }
+                }, note.time);
+            });
+        }
+
+        function startMusic(){
+            const notes=[262,294,330,349,392,440,494,523];
+            let i=0;
+            bgMusic=setInterval(()=>{
+                if(!muted&&gameRunning){
+                    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+                    o.connect(g);g.connect(audioCtx.destination);
+                    o.frequency.value=notes[i%8];o.type='sine';
+                    g.gain.setValueAtTime(.05,audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(.01,audioCtx.currentTime+.3);
+                    o.start();o.stop(audioCtx.currentTime+.3);
+                    i++;
+                }
+            },400);
+        }
+
+        document.getElementById('muteBtn').onclick=function(){
+            muted=!muted;
+            this.textContent=muted?'🔇':'🔊';
+        };
+
+        function startTimer(){
+            timeLeft=timePerQ;
+            document.getElementById('timeLeft').textContent=timeLeft;
+            document.getElementById('timer').classList.remove('warning');
+            clearInterval(timerInt);
+            timerInt=setInterval(()=>{
+                timeLeft--;
+                document.getElementById('timeLeft').textContent=timeLeft;
+                if(timeLeft<=3){
+                    document.getElementById('timer').classList.add('warning');
+                    sound(800,.1);
+                }
+                if(timeLeft<=0){
+                    clearInterval(timerInt);
+                    timeout();
+                }
+            },1000);
+        }
+
+        function timeout(){
+            wrongSound();
+            showFeedback(false);
+            if(twoPlayer){
+                p1.streak=p2.streak=0;
+                p1.lives--;p2.lives--;
+                updateHUD();
+                if(p1.lives<=0&&p2.lives<=0){endGame();return}
+            }else{
+                p1.streak=0;p1.lives--;
+                updateHUD();
+                if(p1.lives<=0){endGame();return}
+            }
+            setTimeout(genQuestion,1000);
+        }
+
+        function showFeedback(ok){
+            const f=document.getElementById('feedbackAnimation');
+            f.className='';
+            f.textContent=ok?'✅ ¡CORRECTO!':'❌ ¡ERROR!';
+            f.style.color=ok?'#0f8':'#f00';
+            setTimeout(()=>f.classList.add('show'),10);
+        }
+
+        function genQuestion(){
+            answerGiven = false;
+            startTimer();
+            const active=Object.keys(ops).filter(k=>ops[k]);
+            if(!active.length){ops.suma=true;active.push('suma')}
+            const op=active[Math.floor(Math.random()*active.length)];
+            let n1,n2,q;
+
+            switch(op){
+                case 'suma':
+                    n1=Math.floor(Math.random()*50)+1;
+                    n2=Math.floor(Math.random()*50)+1;
+                    correct=(n1+n2)+'';
+                    q=`${n1} + ${n2} = ?`;
+                    break;
+                case 'resta':
+                    n1=Math.floor(Math.random()*50)+10;
+                    n2=Math.floor(Math.random()*n1);
+                    correct=(n1-n2)+'';
+                    q=`${n1} - ${n2} = ?`;
+                    break;
+                case 'mult':
+                    n1=Math.floor(Math.random()*12)+1;
+                    n2=Math.floor(Math.random()*12)+1;
+                    correct=(n1*n2)+'';
+                    q=`${n1} × ${n2} = ?`;
+                    break;
+                case 'div':
+                    n2=Math.floor(Math.random()*10)+1;
+                    const r=Math.floor(Math.random()*10)+1;
+                    n1=n2*r;
+                    correct=r+'';
+                    q=`${n1} ÷ ${n2} = ?`;
+                    break;
+                case 'frac':
+                    const gcd=(a,b)=>b?gcd(b,a%b):a;
+                    const fracOps=['suma','resta','mult','div','simplificar'];
+                    const fracOp=fracOps[Math.floor(Math.random()*fracOps.length)];
+                    
+                    if(fracOp==='simplificar'){
+                        // Generar fracciones donde AMBOS numerador y denominador sean pares
+                        // Primero generamos una fracción simplificada
+                        const numSimple = Math.floor(Math.random()*7)+1; // 1-7
+                        const denSimple = Math.floor(Math.random()*7)+2; // 2-8 (evitar 1)
+                        
+                        // Multiplicamos por un número par para que ambos sean pares
+                        const multiplicador = (Math.floor(Math.random()*4)+1)*2; // 2, 4, 6, 8
+                        
+                        const numeradorPar = numSimple * multiplicador; // Par
+                        const denominadorPar = denSimple * multiplicador; // Par
+                        
+                        const d = gcd(numeradorPar, denominadorPar);
+                        correct = `${numeradorPar/d}/${denominadorPar/d}`;
+                        q = `Simplifica: ${numeradorPar}/${denominadorPar}`;
+                    }else{
+                        let num1=Math.floor(Math.random()*9)+1;
+                        let den1=Math.floor(Math.random()*9)+1;
+                        let num2=Math.floor(Math.random()*9)+1;
+                        let den2=Math.floor(Math.random()*9)+1;
+                        
+                        let resNum,resDen;
+                        
+                        if(fracOp==='suma'){
+                            resNum=num1*den2+num2*den1;
+                            resDen=den1*den2;
+                            q=`${num1}/${den1} + ${num2}/${den2} = ?`;
+                        }else if(fracOp==='resta'){
+                            resNum=num1*den2-num2*den1;
+                            resDen=den1*den2;
+                            if(resNum<0){
+                                [num1,num2]=[num2,num1];
+                                [den1,den2]=[den2,den1];
+                                resNum=num1*den2-num2*den1;
+                            }
+                            q=`${num1}/${den1} - ${num2}/${den2} = ?`;
+                        }else if(fracOp==='mult'){
+                            resNum=num1*num2;
+                            resDen=den1*den2;
+                            q=`${num1}/${den1} × ${num2}/${den2} = ?`;
+                        }else{
+                            resNum=num1*den2;
+                            resDen=den1*num2;
+                            q=`${num1}/${den1} ÷ ${num2}/${den2} = ?`;
+                        }
+                        
+                        // NO simplificar - dejar el resultado tal cual
+                        correct=resDen===1?`${resNum}`:`${resNum}/${resDen}`;
+                    }
+                    break;
+                case 'pot':
+                    n1=Math.floor(Math.random()*5)+2;
+                    n2=Math.floor(Math.random()*3)+2;
+                    correct=Math.pow(n1,n2)+'';
+                    q=`${n1}^${n2} = ?`;
+                    break;
+            }
+            document.getElementById('mathQuestion').textContent=q;
+            genAsteroids(op);
+        }
+
+        function genAsteroids(type){
+            asteroids.length=0;
+            const ans=[correct];
+            while(ans.length<8){
+                let w;
+                if(type==='frac'){
+                    if(correct.includes('/')){
+                        const parts=correct.split('/');
+                        const num=parseInt(parts[0]);
+                        const den=parseInt(parts[1]);
+                        
+                        // Generar variaciones sin simplificar
+                        const variation = Math.floor(Math.random()*4);
+                        if(variation === 0){
+                            // Cambiar numerador
+                            w=`${num+(Math.floor(Math.random()*5)-2)}/${den}`;
+                        }else if(variation === 1){
+                            // Cambiar denominador
+                            w=`${num}/${den+(Math.floor(Math.random()*5)-2)}`;
+                        }else if(variation === 2){
+                            // Cambiar ambos ligeramente
+                            w=`${num+(Math.floor(Math.random()*3)-1)}/${den+(Math.floor(Math.random()*3)-1)}`;
+                        }else{
+                            // Generar fracción aleatoria con denominadores similares
+                            const n=Math.floor(Math.random()*20)+1;
+                            const d=den+(Math.floor(Math.random()*10)-5);
+                            if(d>0) w=`${n}/${d}`;
+                            else continue;
+                        }
+                    }else{
+                        // Si es un número entero, generar números cercanos
+                        const c=parseInt(correct);
+                        w=(c+Math.floor(Math.random()*10)-5)+'';
+                    }
+                }else{
+                    const c=parseFloat(correct);
+                    w=(c+Math.floor(Math.random()*20)-10)+'';
+                    if(w==='0'||w===correct)continue;
+                }
+                if(!ans.includes(w)&&w!=='0/1'&&!w.includes('-')&&w!=='0/0'&&!w.endsWith('/0'))ans.push(w);
+            }
+            ans.sort(()=>Math.random()-.5);
+            const cols=[...colors].sort(()=>Math.random()-.5);
+            const pos=[];
+            for(let i=0;i<8;i++){
+                let x,y,ok;
+                do{
+                    ok=true;
+                    x=Math.random()*(canvas.width-120)+60;
+                    y=Math.random()*(canvas.height-300)+80;
+                    for(let p of pos)if(Math.hypot(x-p.x,y-p.y)<140)ok=false;
+                    if(Math.hypot(x-p1.x,y-p1.y)<150)ok=false;
+                    if(twoPlayer&&Math.hypot(x-p2.x,y-p2.y)<150)ok=false;
+                }while(!ok);
+                pos.push({x,y});
+                asteroids.push({x,y,size:55,ans:ans[i],ok:ans[i]===correct,got:false,rot:Math.random()*6.28,rs:(Math.random()-.5)*.05,col:cols[i]});
+            }
+        }
+
+        function addParticles(x,y,c,n=20){
+            for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*8,vy:(Math.random()-.5)*8,life:1,col:c,size:Math.random()*4+2});
+        }
+
+        function drawShip(p){
+            if(p.destroyed && !p.exploding) return;
+            
+            if(p.exploding){
+                ctx.save();
+                ctx.translate(p.x,p.y);
+                const progress = p.explosionFrame / 30;
+                
+                for(let i=0;i<12;i++){
+                    const angle = (i/12) * Math.PI * 2;
+                    const dist = progress * 80;
+                    const px = Math.cos(angle) * dist;
+                    const py = Math.sin(angle) * dist;
+                    
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = 1 - progress;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 8 - progress * 6, 0, 6.28);
+                    ctx.fill();
+                }
+                
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = (1 - progress) * 0.8;
+                ctx.beginPath();
+                ctx.arc(0, 0, p.size * (1 + progress * 2), 0, 6.28);
+                ctx.fill();
+                
+                ctx.globalAlpha = 1;
+                ctx.restore();
+                
+                p.explosionFrame++;
+                if(p.explosionFrame >= 30){
+                    p.exploding = false;
+                    p.destroyed = true;
+                }
+                return;
+            }
+            
+            ctx.save();
+            ctx.translate(p.x,p.y);
+            
+            ctx.fillStyle=p.color;
+            ctx.shadowBlur=20;
+            ctx.shadowColor=p.color;
+            ctx.beginPath();
+            ctx.moveTo(0,-p.size);
+            ctx.lineTo(p.size*.5,-p.size*.2);
+            ctx.lineTo(p.size*.7,p.size*.6);
+            ctx.lineTo(p.size*.3,p.size*.4);
+            ctx.lineTo(0,p.size*.7);
+            ctx.lineTo(-p.size*.3,p.size*.4);
+            ctx.lineTo(-p.size*.7,p.size*.6);
+            ctx.lineTo(-p.size*.5,-p.size*.2);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.shadowBlur=0;
+            
+            ctx.strokeStyle='rgba(255,255,255,0.5)';
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.moveTo(p.size*.4,-p.size*.1);
+            ctx.lineTo(p.size*.5,p.size*.3);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-p.size*.4,-p.size*.1);
+            ctx.lineTo(-p.size*.5,p.size*.3);
+            ctx.stroke();
+            
+            const gradient = ctx.createRadialGradient(0,-p.size*.4,0,0,-p.size*.4,p.size*.35);
+            gradient.addColorStop(0,'rgba(100,200,255,0.9)');
+            gradient.addColorStop(1,'rgba(0,100,200,0.5)');
+            ctx.fillStyle=gradient;
+            ctx.beginPath();
+            ctx.arc(0,-p.size*.4,p.size*.35,0,6.28);
+            ctx.fill();
+            
+            ctx.fillStyle='rgba(255,255,255,0.6)';
+            ctx.beginPath();
+            ctx.arc(-p.size*.15,-p.size*.5,p.size*.15,0,6.28);
+            ctx.fill();
+            
+            ctx.fillStyle='#f80';
+            ctx.shadowBlur=15;
+            ctx.shadowColor='#f80';
+            ctx.beginPath();
+            ctx.ellipse(0,p.size*.5,p.size*.25,p.size*.15,0,0,6.28);
+            ctx.fill();
+            
+            const flameSize = Math.sin(Date.now() * 0.01) * 0.1 + 0.9;
+            ctx.fillStyle='#ff0';
+            ctx.globalAlpha=0.8;
+            ctx.beginPath();
+            ctx.ellipse(0,p.size*.65,p.size*.15,p.size*.2*flameSize,0,0,6.28);
+            ctx.fill();
+            
+            ctx.globalAlpha=1;
+            ctx.shadowBlur=0;
+            ctx.restore();
+        }
+
+        function drawAst(a){
+            if(a.got)return;
+            ctx.save();
+            ctx.translate(a.x,a.y);
+            ctx.rotate(a.rot);
+            ctx.fillStyle=a.col;
+            ctx.shadowBlur=20;
+            ctx.shadowColor=a.col;
+            ctx.beginPath();
+            for(let i=0;i<8;i++){
+                const ang=i*.785,rad=a.size*(.8+Math.random()*.2);
+                ctx[i?'lineTo':'moveTo'](Math.cos(ang)*rad,Math.sin(ang)*rad);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur=0;
+            ctx.fillStyle='#fff';
+            ctx.font='bold 20px Arial';
+            ctx.textAlign='center';
+            ctx.textBaseline='middle';
+            ctx.rotate(-a.rot);
+            ctx.fillText(a.ans,0,0);
+            ctx.restore();
+            a.rot+=a.rs;
+        }
+
+        function drawPart(){
+            particles.forEach((p,i)=>{
+                if(p.life<=0){particles.splice(i,1);return}
+                ctx.fillStyle=p.col;
+                ctx.globalAlpha=p.life;
+                ctx.beginPath();
+                ctx.arc(p.x,p.y,p.size,0,6.28);
+                ctx.fill();
+                ctx.globalAlpha=1;
+                p.x+=p.vx;p.y+=p.vy;p.life-=.02;p.vy+=.2;
+            });
+        }
+
+        function updateHUD(){
+            document.getElementById('score1').textContent=p1.score;
+            document.getElementById('lives1').textContent=p1.lives;
+            document.getElementById('streak1').textContent=p1.streak;
+            if(twoPlayer){
+                document.getElementById('score2').textContent=p2.score;
+                document.getElementById('lives2').textContent=p2.lives;
+                document.getElementById('streak2').textContent=p2.streak;
+            }
+        }
+
+        function checkCollision(p){
+            if(answerGiven || p.destroyed || p.exploding) return;
+            asteroids.forEach(a=>{
+                if(a.got)return;
+                if(Math.hypot(p.x-a.x,p.y-a.y)<p.size+a.size*.6){
+                    a.got=true;
+                    answerGiven=true;
+                    if(a.ok){
+                        p.streak++;
+                        const pts=15*Math.max(1,Math.floor(p.streak/3));
+                        p.score+=pts;
+                        addParticles(a.x,a.y,'#0f8',30);
+                        correctSound();
+                        showFeedback(true);
+                        updateHUD();
+                        setTimeout(genQuestion,500);
+                    }else{
+                        p.streak=0;
+                        p.lives--;
+                        addParticles(a.x,a.y,'#f00',25);
+                        wrongSound();
+                        showFeedback(false);
+                        updateHUD();
+                        
+                        if(p.lives<=0){
+                            p.exploding=true;
+                            p.explosionFrame=0;
+                            addParticles(p.x,p.y,p.color,50);
+                            addParticles(p.x,p.y,'#ff0',30);
+                            addParticles(p.x,p.y,'#f80',30);
+                            sound(100,.3,'sawtooth');
+                            setTimeout(()=>sound(80,.5,'sawtooth'),100);
+                        }
+                        
+                        if(twoPlayer){
+                            if(p1.lives<=0&&p2.lives<=0){
+                                setTimeout(endGame,1500);
+                                return;
+                            }
+                        }else{
+                            if(p.lives<=0){
+                                setTimeout(endGame,1500);
+                                return;
+                            }
+                        }
+                        setTimeout(genQuestion,500);
+                    }
+                }
+            });
+        }
+
+        function update(){
+            if(!gameRunning)return;
+            
+            if(!p1.destroyed && !p1.exploding){
+                p1.dx=p1.dy=0;
+                if(keys.ArrowUp)p1.dy=-p1.speed;
+                if(keys.ArrowDown)p1.dy=p1.speed;
+                if(keys.ArrowLeft)p1.dx=-p1.speed;
+                if(keys.ArrowRight)p1.dx=p1.speed;
+                p1.x=Math.max(p1.size,Math.min(canvas.width-p1.size,p1.x+p1.dx));
+                p1.y=Math.max(p1.size,Math.min(canvas.height-p1.size,p1.y+p1.dy));
+                checkCollision(p1);
+            }
+
+            if(twoPlayer && !p2.destroyed && !p2.exploding){
+                p2.dx=p2.dy=0;
+                if(keys.w)p2.dy=-p2.speed;
+                if(keys.s)p2.dy=p2.speed;
+                if(keys.a)p2.dx=-p2.speed;
+                if(keys.d)p2.dx=p2.speed;
+                p2.x=Math.max(p2.size,Math.min(canvas.width-p2.size,p2.x+p2.dx));
+                p2.y=Math.max(p2.size,Math.min(canvas.height-p2.size,p2.y+p2.dy));
+                checkCollision(p2);
+            }
+        }
+
+        function draw(){
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            asteroids.forEach(drawAst);
+            drawShip(p1);
+            if(twoPlayer)drawShip(p2);
+            drawPart();
+        }
+
+        function loop(){
+            update();
+            draw();
+            if(gameRunning)requestAnimationFrame(loop);
+        }
+
+        document.addEventListener('keydown',e=>{
+            if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(e.key)){
+                e.preventDefault();
+                keys[e.key]=true;
+            }
+        });
+        document.addEventListener('keyup',e=>keys[e.key]=false);
+
+        function startGame(){
+            timePerQ=parseInt(document.getElementById('timeInput').value)||15;
+            document.getElementById('instructions').classList.add('hidden');
+            document.getElementById('muteBtn').classList.remove('hidden');
+            gameRunning=true;
+            startMusic();
+            genQuestion();
+            loop();
+        }
+
+        function endGame(){
+            gameRunning=false;
+            clearInterval(timerInt);
+            clearInterval(bgMusic);
+            
+            victorySound();
+            
+            let res='';
+            if(twoPlayer){
+                res=`<p>🚀 J1: ${p1.score} pts | Racha: ${p1.streak}</p>`;
+                res+=`<p>🛸 J2: ${p2.score} pts | Racha: ${p2.streak}</p>`;
+                res+=`<p style="font-size:28px;margin-top:20px">${p1.score>p2.score?'🏆 ¡JUGADOR 1 GANA!':p2.score>p1.score?'🏆 ¡JUGADOR 2 GANA!':'🤝 ¡EMPATE!'}</p>`;
+            }else{
+                res=`<p>Puntuación: ${p1.score}</p><p>Racha Máxima: ${p1.streak}</p>`;
+            }
+            document.getElementById('results').innerHTML=res;
+            document.getElementById('gameOver').classList.remove('hidden');
+        }
+
+        window.addEventListener('resize',()=>{
+            canvas.width=window.innerWidth;
+            canvas.height=window.innerHeight;
+        });
+    </script>
+</body>
+</html>
